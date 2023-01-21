@@ -1096,6 +1096,8 @@ def main():
         if args.train_text_encoder:
             text_encoder.gradient_checkpointing_enable()
 
+    torch.backends.cuda.matmul.allow_tf32 = True
+
     if args.use_xformers:
         unet.set_use_memory_efficient_attention_xformers(True)
 
