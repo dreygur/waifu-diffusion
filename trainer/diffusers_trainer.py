@@ -108,6 +108,23 @@ parser.add_argument(
     "--use_ema", type=bool_t, default="False", help="Use EMA for finetuning"
 )
 parser.add_argument(
+    "--revision",
+    type=str,
+    default=None,
+    required=False,
+    help="Revision of pretrained model identifier from huggingface.co/models.",
+)
+parser.add_argument(
+    "--non_ema_revision",
+    type=str,
+    default=None,
+    required=False,
+    help=(
+        "Revision of pretrained non-ema model identifier. Must be a branch, tag or git identifier of the local or"
+        " remote repository specified with --pretrained_model_name_or_path."
+    ),
+)
+parser.add_argument(
     "--ucg",
     type=float,
     default=0.1,
@@ -276,6 +293,9 @@ parser.add_argument(
 
 
 args = parser.parse_args()
+
+if args.non_ema_revision is None:
+    args.non_ema_revision = args.revision
 
 
 def setup():
@@ -1068,16 +1088,28 @@ def main():
         args.model = args.resume
 
     tokenizer = CLIPTokenizer.from_pretrained(
-        args.model, subfolder="tokenizer", use_auth_token=args.hf_token
+        args.model,
+        subfolder="tokenizer",
+        use_auth_token=args.hf_token,
+        revision=args.revision,
     )
     text_encoder = CLIPTextModel.from_pretrained(
-        args.model, subfolder="text_encoder", use_auth_token=args.hf_token
+        args.model,
+        subfolder="text_encoder",
+        use_auth_token=args.hf_token,
+        revision=args.revision,
     )
     vae = AutoencoderKL.from_pretrained(
-        args.model, subfolder="vae", use_auth_token=args.hf_token
+        args.model,
+        subfolder="vae",
+        use_auth_token=args.hf_token,
+        revision=args.revision,
     )
     unet = UNet2DConditionModel.from_pretrained(
-        args.model, subfolder="unet", use_auth_token=args.hf_token
+        args.model,
+        subfolder="unet",
+        use_auth_token=args.hf_token,
+        revision=args.non_ema_revision,
     )
 
     # Freeze vae and text_encoder
@@ -1201,7 +1233,13 @@ def main():
 
     # create ema
     if args.use_ema:
-        ema_unet = EMAModel(unet.parameters())
+        ema_unet = UNet2DConditionModel.from_pretrained(
+            args.model,
+            subfolder="unet",
+            revision=args.revision,
+        )
+        ema_unet = ema_unet.to(device, dtype=torch.float32)
+        ema_unet = EMAModel(ema_unet.parameters())
 
     print(get_gpu_ram())
 
